@@ -6,34 +6,48 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 )
 
+// Cache is an in-memory file cache.
 type Cache struct {
 	buf     map[string]*strings.Builder
 	readAny bool
 	prefix  string
-	length  int
+	size    int64
 	mu      *sync.RWMutex
 }
 
-func ReadDir(dir, pattern string) (*Cache, error) {
-	return ReadDirContext(context.Background(), dir, pattern)
+// ReadDir reads a directory recursively and creates a cache
+// of all files that match the expr. Errors if dir or any files under it can't be read.
+//
+// Files are cached in a hash map and its buffered content can be read using
+// their path without the parent directory included as the key.
+func ReadDir(dir, expr string) (*Cache, error) {
+	return ReadDirContext(context.Background(), dir, expr)
 }
 
-func ReadDirContext(ctx context.Context, dir, pattern string) (*Cache, error) {
+// ReadDirContext is the context-aware equivalent of ReadDir.
+// If a context gets done before it finishes caching all files, it returns an error.
+func ReadDirContext(ctx context.Context, dir, expr string) (*Cache, error) {
 	c := &Cache{
 		buf:    make(map[string]*strings.Builder),
 		prefix: dir,
 		mu:     &sync.RWMutex{},
 	}
-	if err := c.readDir(ctx, dir, pattern); err != nil {
+	r, err := regexp.Compile(expr)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.readDir(ctx, dir, r); err != nil {
 		return nil, err
 	}
 	return c, nil
 }
 
+// Get returns a buffered file content.
 func (c *Cache) Get(name string) string {
 	c.mu.RLock()
 	s, ok := c.buf[filepath.Join(c.prefix, name)]
@@ -44,32 +58,39 @@ func (c *Cache) Get(name string) string {
 	return s.String()
 }
 
+// Len returns the number of files cached.
 func (c *Cache) Len() int {
-	return c.length
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.buf)
 }
 
+// Range iterates over the map that holds the cached content.
 func (c *Cache) Range(fn func(k, v string)) {
 	for k, v := range c.buf {
 		fn(k, v.String())
 	}
 }
 
-func (c *Cache) check(dir, pattern string, ff os.FileInfo) error {
+// Size returns the total size in bytes of all cached files.
+func (c *Cache) Size() int64 {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.size
+}
+
+func (c *Cache) check(dir string, r *regexp.Regexp, ff os.FileInfo) error {
 	name := ff.Name()
 	fullName := filepath.Join(dir, name)
 	if ff.IsDir() {
-		return <-c.walk(fullName, pattern)
+		return <-c.walk(fullName, r)
 	}
 	f, err := os.Open(fullName)
 	if err != nil {
 		return err
 	}
 
-	ok, err := filepath.Match(pattern, name)
-	if err != nil {
-		return err
-	}
-	if ok {
+	if r.MatchString(name) {
 		return c.copy(f)
 	}
 	return nil
@@ -77,26 +98,27 @@ func (c *Cache) check(dir, pattern string, ff os.FileInfo) error {
 
 func (c *Cache) copy(f *os.File) error {
 	var bd strings.Builder
-	if _, err := io.Copy(&bd, f); err != nil {
+	n, err := io.Copy(&bd, f)
+	if err != nil {
 		return err
 	}
 	c.mu.Lock()
 	c.buf[f.Name()] = &bd
+	c.size += n
 	c.mu.Unlock()
-	c.length++
 	return nil
 }
 
-func (c *Cache) readDir(ctx context.Context, dir, pattern string) error {
+func (c *Cache) readDir(ctx context.Context, dir string, r *regexp.Regexp) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case err := <-c.walk(dir, pattern):
+	case err := <-c.walk(dir, r):
 		return err
 	}
 }
 
-func (c *Cache) walk(dir, pattern string) <-chan error {
+func (c *Cache) walk(dir string, r *regexp.Regexp) <-chan error {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		e := make(chan error, 1)
@@ -111,7 +133,7 @@ func (c *Cache) walk(dir, pattern string) <-chan error {
 	for _, ff := range files {
 		go func(ff os.FileInfo) {
 			defer wg.Done()
-			if err := c.check(dir, pattern, ff); err != nil {
+			if err := c.check(dir, r, ff); err != nil {
 				select {
 				case e <- err:
 				default:

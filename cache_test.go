@@ -3,7 +3,9 @@ package filecache_test
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 
 	. "github.com/gbrlsnchs/filecache"
@@ -11,27 +13,32 @@ import (
 
 func TestBuffer(t *testing.T) {
 	testCases := []struct {
-		isNotExist bool
-		length     int
-		err        error
 		dir        string
-		pattern    string
+		expr       string
 		cancel     bool
+		files      []string
+		err        error
+		isNotExist bool
 	}{
-		{isNotExist: true, pattern: "*"},
-		{dir: "testdata", length: 2, pattern: "*"},
-		{dir: "testdata", length: 1, pattern: "*.go"},
-		{dir: "testdata", err: context.Canceled, cancel: true, pattern: "*"},
+		{expr: ".", isNotExist: true},
+		{dir: "testdata", expr: ".", files: []string{"lorem.txt", "main.go", "test.go", "test.log"}},
+		{dir: "testdata", expr: `\.txt`, files: []string{"lorem.txt"}},
+		{dir: "testdata", expr: `\.go$`, files: []string{"main.go", "test.go"}},
+		{dir: "testdata", expr: `\.(go|log)$`, files: []string{"main.go", "test.go", "test.log"}},
+		{dir: "testdata", expr: `^main\.+`, files: []string{"main.go"}},
+		{dir: "testdata", expr: `^test\.+`, files: []string{"test.log", "test.go"}},
+		{dir: "testdir", isNotExist: true},
+		{dir: "testdata", expr: ".", err: context.Canceled, cancel: true},
 	}
 	for _, tc := range testCases {
-		t.Run(fmt.Sprintf("%s/**/%s", tc.dir, tc.pattern), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s/%s", tc.dir, tc.expr), func(t *testing.T) {
 			ctx := context.Background()
 			if tc.cancel {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithCancel(ctx)
 				cancel()
 			}
-			c, err := ReadDirContext(ctx, tc.dir, tc.pattern)
+			c, err := ReadDirContext(ctx, tc.dir, tc.expr)
 			if e, ok := err.(*os.PathError); ok {
 				if want, got := tc.isNotExist, os.IsNotExist(e); want != got {
 					t.Errorf("want %t, got %t", want, got)
@@ -40,13 +47,18 @@ func TestBuffer(t *testing.T) {
 				t.Errorf("want %v, got %v", want, got)
 			}
 			if c != nil {
-				if want, got := tc.length, c.Len(); want != got {
+				if want, got := len(tc.files), c.Len(); want != got {
 					t.Errorf("want %d, got %d", want, got)
 				}
-				c.Range(func(k, v string) {
-					t.Log(k)
-					t.Log(v)
-				})
+				for _, fname := range tc.files {
+					b, err := ioutil.ReadFile(filepath.Join(tc.dir, fname))
+					if want, got := (error)(nil), err; want != got {
+						t.Errorf("want %v, got %v", want, got)
+					}
+					if want, got := string(b), c.Get(fname); want != got {
+						t.Errorf("want %s, got %s", want, got)
+					}
+				}
 			}
 		})
 	}
