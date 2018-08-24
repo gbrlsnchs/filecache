@@ -18,17 +18,17 @@ type Cache struct {
 	mu      *sync.RWMutex
 }
 
-func ReadDir(dir, glob string) (*Cache, error) {
-	return ReadDirContext(context.Background(), dir, glob)
+func ReadDir(dir, pattern string) (*Cache, error) {
+	return ReadDirContext(context.Background(), dir, pattern)
 }
 
-func ReadDirContext(ctx context.Context, dir, glob string) (*Cache, error) {
+func ReadDirContext(ctx context.Context, dir, pattern string) (*Cache, error) {
 	c := &Cache{
 		buf:    make(map[string]*strings.Builder),
 		prefix: dir,
 		mu:     &sync.RWMutex{},
 	}
-	if err := c.readDir(ctx, dir, glob); err != nil {
+	if err := c.readDir(ctx, dir, pattern); err != nil {
 		return nil, err
 	}
 	return c, nil
@@ -54,18 +54,18 @@ func (c *Cache) Range(fn func(k, v string)) {
 	}
 }
 
-func (c *Cache) check(dir, glob string, ff os.FileInfo) error {
+func (c *Cache) check(dir, pattern string, ff os.FileInfo) error {
 	name := ff.Name()
 	fullName := filepath.Join(dir, name)
 	if ff.IsDir() {
-		return <-c.walk(fullName, glob)
+		return <-c.walk(fullName, pattern)
 	}
 	f, err := os.Open(fullName)
 	if err != nil {
 		return err
 	}
 
-	ok, err := filepath.Match(glob, name)
+	ok, err := filepath.Match(pattern, name)
 	if err != nil {
 		return err
 	}
@@ -87,16 +87,16 @@ func (c *Cache) copy(f *os.File) error {
 	return nil
 }
 
-func (c *Cache) readDir(ctx context.Context, dir, glob string) error {
+func (c *Cache) readDir(ctx context.Context, dir, pattern string) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case err := <-c.walk(dir, glob):
+	case err := <-c.walk(dir, pattern):
 		return err
 	}
 }
 
-func (c *Cache) walk(dir, glob string) <-chan error {
+func (c *Cache) walk(dir, pattern string) <-chan error {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		e := make(chan error, 1)
@@ -111,7 +111,7 @@ func (c *Cache) walk(dir, glob string) <-chan error {
 	for _, ff := range files {
 		go func(ff os.FileInfo) {
 			defer wg.Done()
-			if err := c.check(dir, glob, ff); err != nil {
+			if err := c.check(dir, pattern, ff); err != nil {
 				select {
 				case e <- err:
 				default:
