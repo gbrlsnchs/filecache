@@ -22,7 +22,7 @@ func TestBuffer(t *testing.T) {
 	}{
 		{expr: ".", isNotExist: true},
 		{dir: "testdata", expr: ".", files: []string{"lorem.txt", "main.go", "test.go", "test.log"}},
-		{dir: "testdata", expr: `\.txt`, files: []string{"lorem.txt"}},
+		{dir: "testdata", expr: `\.txt$`, files: []string{"lorem.txt"}},
 		{dir: "testdata", expr: `\.go$`, files: []string{"main.go", "test.go"}},
 		{dir: "testdata", expr: `\.(go|log)$`, files: []string{"main.go", "test.go", "test.log"}},
 		{dir: "testdata", expr: `^main\.+`, files: []string{"main.go"}},
