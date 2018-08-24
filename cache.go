@@ -12,26 +12,23 @@ import (
 
 type Cache struct {
 	buf     map[string]*strings.Builder
-	exts    []string
 	readAny bool
 	prefix  string
 	length  int
 	mu      *sync.RWMutex
 }
 
-func ReadDir(dir string, exts ...string) (*Cache, error) {
-	return ReadDirContext(context.Background(), dir, exts...)
+func ReadDir(dir, glob string) (*Cache, error) {
+	return ReadDirContext(context.Background(), dir, glob)
 }
 
-func ReadDirContext(ctx context.Context, dir string, exts ...string) (*Cache, error) {
+func ReadDirContext(ctx context.Context, dir, glob string) (*Cache, error) {
 	c := &Cache{
-		buf:     make(map[string]*strings.Builder),
-		exts:    exts,
-		readAny: len(exts) == 0,
-		prefix:  dir,
-		mu:      &sync.RWMutex{},
+		buf:    make(map[string]*strings.Builder),
+		prefix: dir,
+		mu:     &sync.RWMutex{},
 	}
-	if err := c.readDir(ctx, dir); err != nil {
+	if err := c.readDir(ctx, dir, glob); err != nil {
 		return nil, err
 	}
 	return c, nil
@@ -57,25 +54,23 @@ func (c *Cache) Range(fn func(k, v string)) {
 	}
 }
 
-func (c *Cache) check(dir string, ff os.FileInfo) error {
+func (c *Cache) check(dir, glob string, ff os.FileInfo) error {
 	name := ff.Name()
 	fullName := filepath.Join(dir, name)
 	if ff.IsDir() {
-		return <-c.walk(fullName)
+		return <-c.walk(fullName, glob)
 	}
 	f, err := os.Open(fullName)
 	if err != nil {
 		return err
 	}
 
-	if c.readAny {
-		return c.copy(f)
+	ok, err := filepath.Match(glob, name)
+	if err != nil {
+		return err
 	}
-	ext := filepath.Ext(name)
-	for i := range c.exts {
-		if c.exts[i] == ext {
-			return c.copy(f)
-		}
+	if ok {
+		return c.copy(f)
 	}
 	return nil
 }
@@ -92,16 +87,16 @@ func (c *Cache) copy(f *os.File) error {
 	return nil
 }
 
-func (c *Cache) readDir(ctx context.Context, dir string) error {
+func (c *Cache) readDir(ctx context.Context, dir, glob string) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case err := <-c.walk(dir):
+	case err := <-c.walk(dir, glob):
 		return err
 	}
 }
 
-func (c *Cache) walk(dir string) <-chan error {
+func (c *Cache) walk(dir, glob string) <-chan error {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		e := make(chan error, 1)
@@ -116,7 +111,7 @@ func (c *Cache) walk(dir string) <-chan error {
 	for _, ff := range files {
 		go func(ff os.FileInfo) {
 			defer wg.Done()
-			if err := c.check(dir, ff); err != nil {
+			if err := c.check(dir, glob, ff); err != nil {
 				select {
 				case e <- err:
 				default:
