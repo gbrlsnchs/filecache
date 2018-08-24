@@ -47,17 +47,22 @@ func TestBuffer(t *testing.T) {
 				t.Errorf("want %v, got %v", want, got)
 			}
 			if c != nil {
-				if want, got := len(tc.files), c.Len(); want != got {
+				if want, got := len(tc.files), c.Count(); want != got {
 					t.Errorf("want %d, got %d", want, got)
 				}
+				var size int
 				for _, fname := range tc.files {
 					b, err := ioutil.ReadFile(filepath.Join(tc.dir, fname))
 					if want, got := (error)(nil), err; want != got {
 						t.Errorf("want %v, got %v", want, got)
 					}
+					size += len(b)
 					if want, got := string(b), c.Get(fname); want != got {
 						t.Errorf("want %s, got %s", want, got)
 					}
+				}
+				if want, got := size, c.Len(); want != got {
+					t.Errorf("want %d, got %d", want, got)
 				}
 			}
 		})
