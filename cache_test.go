@@ -2,6 +2,7 @@ package filecache_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 
@@ -14,21 +15,23 @@ func TestBuffer(t *testing.T) {
 		length     int
 		err        error
 		dir        string
+		pattern    string
 		cancel     bool
 	}{
-		{isNotExist: true},
-		{dir: "testdata", length: 1},
-		{dir: "testdata", err: context.Canceled, cancel: true},
+		{isNotExist: true, pattern: "*"},
+		{dir: "testdata", length: 2, pattern: "*"},
+		{dir: "testdata", length: 1, pattern: "*.go"},
+		{dir: "testdata", err: context.Canceled, cancel: true, pattern: "*"},
 	}
 	for _, tc := range testCases {
-		t.Run(tc.dir, func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s/**/%s", tc.dir, tc.pattern), func(t *testing.T) {
 			ctx := context.Background()
 			if tc.cancel {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithCancel(ctx)
 				cancel()
 			}
-			buf, err := ReadDirContext(ctx, tc.dir)
+			c, err := ReadDirContext(ctx, tc.dir, tc.pattern)
 			if e, ok := err.(*os.PathError); ok {
 				if want, got := tc.isNotExist, os.IsNotExist(e); want != got {
 					t.Errorf("want %t, got %t", want, got)
@@ -36,11 +39,11 @@ func TestBuffer(t *testing.T) {
 			} else if want, got := tc.err, err; want != got {
 				t.Errorf("want %v, got %v", want, got)
 			}
-			if buf != nil {
-				if want, got := tc.length, buf.Len(); want != got {
+			if c != nil {
+				if want, got := tc.length, c.Len(); want != got {
 					t.Errorf("want %d, got %d", want, got)
 				}
-				buf.Range(func(k, v string) {
+				c.Range(func(k, v string) {
 					t.Log(k)
 					t.Log(v)
 				})
