@@ -47,13 +47,6 @@ func ReadDirContext(ctx context.Context, dir, expr string) (*Cache, error) {
 	return c, nil
 }
 
-// Count returns the number of files cached.
-func (c *Cache) Count() int {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return len(c.buf)
-}
-
 // Get returns a buffered file content.
 func (c *Cache) Get(name string) string {
 	c.mu.RLock()
@@ -65,11 +58,11 @@ func (c *Cache) Get(name string) string {
 	return s.String()
 }
 
-// Len returns the total size in bytes of all cached files.
+// Len returns the number of files cached.
 func (c *Cache) Len() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return int(c.size)
+	return len(c.buf)
 }
 
 // Range iterates over the map that holds the cached content.
@@ -77,6 +70,13 @@ func (c *Cache) Range(fn func(k, v string)) {
 	for k, v := range c.buf {
 		fn(k, v.String())
 	}
+}
+
+// Size returns the total size in bytes of all cached files.
+func (c *Cache) Size() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return int(c.size)
 }
 
 func (c *Cache) check(dir string, r *regexp.Regexp, ff os.FileInfo) error {

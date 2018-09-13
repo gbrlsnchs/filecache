@@ -47,7 +47,7 @@ func TestBuffer(t *testing.T) {
 				t.Errorf("want %v, got %v", want, got)
 			}
 			if c != nil {
-				if want, got := len(tc.files), c.Count(); want != got {
+				if want, got := len(tc.files), c.Len(); want != got {
 					t.Errorf("want %d, got %d", want, got)
 				}
 				var size int
@@ -61,7 +61,7 @@ func TestBuffer(t *testing.T) {
 						t.Errorf("want %s, got %s", want, got)
 					}
 				}
-				if want, got := size, c.Len(); want != got {
+				if want, got := size, c.Size(); want != got {
 					t.Errorf("want %d, got %d", want, got)
 				}
 			}
