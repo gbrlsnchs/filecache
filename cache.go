@@ -2,6 +2,7 @@ package filecache
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -9,14 +10,17 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+
+	"github.com/gbrlsnchs/radix"
 )
 
 // Cache is an in-memory file cache.
 type Cache struct {
-	buf     map[string]*strings.Builder
+	tr      *radix.Tree
 	readAny bool
 	prefix  string
 	size    int64
+	length  int
 	mu      *sync.RWMutex
 }
 
@@ -33,7 +37,7 @@ func ReadDir(dir, expr string) (*Cache, error) {
 // If a context gets done before it finishes caching all files, it returns an error.
 func ReadDirContext(ctx context.Context, dir, expr string) (*Cache, error) {
 	c := &Cache{
-		buf:    make(map[string]*strings.Builder),
+		tr:     radix.New(radix.Tsafe),
 		prefix: dir,
 		mu:     &sync.RWMutex{},
 	}
@@ -49,27 +53,18 @@ func ReadDirContext(ctx context.Context, dir, expr string) (*Cache, error) {
 
 // Get returns a buffered file content.
 func (c *Cache) Get(name string) string {
-	c.mu.RLock()
-	s, ok := c.buf[filepath.Join(c.prefix, name)]
-	c.mu.RUnlock()
-	if !ok {
-		return ""
+	n, _ := c.tr.Get(filepath.Join(c.prefix, name))
+	if n != nil {
+		return fmt.Sprint(n.Value)
 	}
-	return s.String()
+	return ""
 }
 
 // Len returns the number of files cached.
 func (c *Cache) Len() int {
-	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return len(c.buf)
-}
-
-// Range iterates over the map that holds the cached content.
-func (c *Cache) Range(fn func(k, v string)) {
-	for k, v := range c.buf {
-		fn(k, v.String())
-	}
+	c.mu.RLock()
+	return c.length
 }
 
 // Size returns the total size in bytes of all cached files.
@@ -77,6 +72,20 @@ func (c *Cache) Size() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return int(c.size)
+}
+
+func (c *Cache) String() string {
+	s := "files"
+	length := c.Len()
+	if length == 1 {
+		s = s[:len(s)-1]
+	}
+	ss := "bytes"
+	size := c.Size()
+	if size == 1 {
+		ss = ss[:len(ss)-1]
+	}
+	return fmt.Sprintf("\n%d %s, %d %s:%v", length, s, size, ss, c.tr)
 }
 
 func (c *Cache) check(dir string, r *regexp.Regexp, ff os.FileInfo) error {
@@ -102,9 +111,11 @@ func (c *Cache) copy(f *os.File) error {
 	if err != nil {
 		return err
 	}
+	c.tr.Add(f.Name(), &bd) // this is thread-safe
+
 	c.mu.Lock()
-	c.buf[f.Name()] = &bd
 	c.size += n
+	c.length++
 	c.mu.Unlock()
 	return nil
 }

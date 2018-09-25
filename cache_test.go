@@ -47,6 +47,8 @@ func TestBuffer(t *testing.T) {
 				t.Errorf("want %v, got %v", want, got)
 			}
 			if c != nil {
+				t.Log(c.String())
+
 				if want, got := len(tc.files), c.Len(); want != got {
 					t.Errorf("want %d, got %d", want, got)
 				}
