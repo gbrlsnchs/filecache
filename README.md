@@ -8,7 +8,7 @@
 ## About
 This package recursively walks through a directory and caches files that match a regexp into a [radix tree](https://en.wikipedia.org/wiki/Radix_tree).
 
-Since it spawns one goroutine for each file/directory lookup, it is also context-aware, enabling all the process to return earlier when the context is done.
+Since it spawns one goroutine for each file / directory lookup, it is also context-aware, enabling all the process to return earlier when the context is done.
 
 ## Usage
 Full documentation [here](https://godoc.org/github.com/gbrlsnchs/filecache).
