@@ -69,8 +69,8 @@ func (c *Cache) Len() int {
 
 // Size returns the total size in bytes of all cached files.
 func (c *Cache) Size() int {
-	c.mu.RLock()
 	defer c.mu.RUnlock()
+	c.mu.RLock()
 	return int(c.size)
 }
 
@@ -88,11 +88,11 @@ func (c *Cache) String() string {
 	return fmt.Sprintf("\n%d %s, %d %s:%v", length, s, size, ss, c.tr)
 }
 
-func (c *Cache) check(dir string, r *regexp.Regexp, ff os.FileInfo) error {
+func (c *Cache) check(ctx context.Context, dir string, r *regexp.Regexp, ff os.FileInfo) error {
 	name := ff.Name()
 	fullName := filepath.Join(dir, name)
 	if ff.IsDir() {
-		return <-c.walk(fullName, r)
+		return c.walk(ctx, fullName, r)
 	}
 	f, err := os.Open(fullName)
 	if err != nil {
@@ -124,38 +124,47 @@ func (c *Cache) readDir(ctx context.Context, dir string, r *regexp.Regexp) error
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case err := <-c.walk(dir, r):
-		return err
+	default:
+		return c.walk(ctx, dir, r)
 	}
 }
 
-func (c *Cache) walk(dir string, r *regexp.Regexp) <-chan error {
+func (c *Cache) walk(ctx context.Context, dir string, r *regexp.Regexp) error {
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithCancel(ctx)
+	defer cancel()
+
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
-		e := make(chan error, 1)
-		e <- err
-		close(e)
-		return e
+		return err
 	}
 
 	e := make(chan error)
 	var wg sync.WaitGroup
 	wg.Add(len(files))
+
 	for _, ff := range files {
 		go func(ff os.FileInfo) {
 			defer wg.Done()
-			if err := c.check(dir, r, ff); err != nil {
+			select {
+			case <-ctx.Done():
 				select {
-				case e <- err:
+				case e <- ctx.Err():
 				default:
+				}
+			default:
+				if err := c.check(ctx, dir, r, ff); err != nil {
+					select {
+					case e <- err:
+						cancel()
+					default:
+					}
 				}
 			}
 		}(ff)
 	}
 
-	go func() {
-		wg.Wait()
-		close(e)
-	}()
-	return e
+	wg.Wait()
+	close(e)
+	return <-e // will emit the first error caught or nil
 }
