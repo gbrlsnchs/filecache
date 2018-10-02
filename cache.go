@@ -19,7 +19,7 @@ type Cache struct {
 	mu      *sync.RWMutex
 	tr      *radix.Tree
 	readAny bool
-	prefix  string
+	dir     string
 	size    int64
 	length  int
 }
@@ -27,9 +27,9 @@ type Cache struct {
 // New returns a file cache ready to read directories.
 func New(dir string) *Cache {
 	return &Cache{
-		mu:     &sync.RWMutex{},
-		tr:     radix.New(radix.Tsafe),
-		prefix: dir,
+		mu:  &sync.RWMutex{},
+		tr:  radix.New(radix.Tsafe),
+		dir: dir,
 	}
 }
 
@@ -38,7 +38,7 @@ func New(dir string) *Cache {
 //
 // Files are cached in a hash map and its buffered content can be read using
 // their path without the parent directory included as the key.
-func ReadDir(dir, expr string) (*Cache, error) {
+func Read(dir, expr string) (*Cache, error) {
 	return ReadDirContext(context.Background(), dir, expr)
 }
 
@@ -46,11 +46,11 @@ func ReadDir(dir, expr string) (*Cache, error) {
 // If a context gets done before it finishes caching all files, it returns an error.
 func ReadDirContext(ctx context.Context, dir, expr string) (*Cache, error) {
 	c := &Cache{
-		mu:     &sync.RWMutex{},
-		tr:     radix.New(radix.Tsafe),
-		prefix: dir,
+		mu:  &sync.RWMutex{},
+		tr:  radix.New(radix.Tsafe),
+		dir: filepath.Join(dir),
 	}
-	if err := c.ReadDirContext(ctx, dir, expr); err != nil {
+	if err := c.LoadContext(ctx, expr); err != nil {
 		return nil, err
 	}
 	return c, nil
@@ -58,7 +58,7 @@ func ReadDirContext(ctx context.Context, dir, expr string) (*Cache, error) {
 
 // Get returns a buffered file content.
 func (c *Cache) Get(name string) string {
-	n, _ := c.tr.Get(filepath.Join(c.prefix, name))
+	n, _ := c.tr.Get(filepath.Join(c.dir, name))
 	if n != nil {
 		return fmt.Sprint(n.Value)
 	}
@@ -93,19 +93,18 @@ func (c *Cache) String() string {
 	return fmt.Sprintf("\n%d %s, %d %s:%v", length, s, size, ss, c.tr)
 }
 
-// ReadDir traverses a directory recursively to read and cache files
-// that match a given regexp.
-func (c *Cache) ReadDir(dir, expr string) error {
-	return c.ReadDirContext(context.Background(), dir, expr)
+// Load traverses the set directory recursively to cache files that match a given regexp.
+func (c *Cache) Load(expr string) error {
+	return c.LoadContext(context.Background(), expr)
 }
 
-// ReadDirContext does the same as ReadDir but is context-aware.
-func (c *Cache) ReadDirContext(ctx context.Context, dir, expr string) error {
+// LoadContext does the same as ReadDir but is context-aware.
+func (c *Cache) LoadContext(ctx context.Context, expr string) error {
 	r, err := regexp.Compile(expr)
 	if err != nil {
 		return err
 	}
-	if err = c.readDir(ctx, dir, r); err != nil {
+	if err = c.readDir(ctx, c.dir, r); err != nil {
 		return err
 	}
 	return nil
