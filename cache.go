@@ -50,11 +50,7 @@ func ReadDirContext(ctx context.Context, dir, expr string) (*Cache, error) {
 		tr:     radix.New(radix.Tsafe),
 		prefix: dir,
 	}
-	r, err := regexp.Compile(expr)
-	if err != nil {
-		return nil, err
-	}
-	if err := c.readDir(ctx, dir, r); err != nil {
+	if err := c.ReadDirContext(ctx, dir, expr); err != nil {
 		return nil, err
 	}
 	return c, nil
@@ -95,6 +91,24 @@ func (c *Cache) String() string {
 		ss = ss[:len(ss)-1]
 	}
 	return fmt.Sprintf("\n%d %s, %d %s:%v", length, s, size, ss, c.tr)
+}
+
+// ReadDir traverses a directory recursively to read and cache files
+// that match a given regexp.
+func (c *Cache) ReadDir(dir, expr string) error {
+	return c.ReadDirContext(context.Background(), dir, expr)
+}
+
+// ReadDirContext does the same as ReadDir but is context-aware.
+func (c *Cache) ReadDirContext(ctx context.Context, dir, expr string) error {
+	r, err := regexp.Compile(expr)
+	if err != nil {
+		return err
+	}
+	if err = c.readDir(ctx, dir, r); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *Cache) check(ctx context.Context, dir string, r *regexp.Regexp, ff os.FileInfo) error {
