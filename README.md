@@ -1,6 +1,6 @@
 # filecache (In-memory file caching using Go)
 [![Build status](https://travis-ci.org/gbrlsnchs/filecache.svg?branch=master)](https://travis-ci.org/gbrlsnchs/filecache)
-[![Build status](https://ci.appveyor.com/api/projects/status/qewple44o5rffms9?svg=true)](https://ci.appveyor.com/project/gbrlsnchs/filecache)
+[![Build status](https://ci.appveyor.com/api/projects/status/qewple44o5rffms9/branch/master?svg=true)](https://ci.appveyor.com/project/gbrlsnchs/filecache/branch/master)
 [![Sourcegraph](https://sourcegraph.com/github.com/gbrlsnchs/filecache/-/badge.svg)](https://sourcegraph.com/github.com/gbrlsnchs/filecache?badge)
 [![GoDoc](https://godoc.org/github.com/gbrlsnchs/filecache?status.svg)](https://godoc.org/github.com/gbrlsnchs/filecache)
 [![Minimal version](https://img.shields.io/badge/minimal%20version-go1.10%2B-5272b4.svg)](https://golang.org/doc/go1.10)
