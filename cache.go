@@ -16,12 +16,21 @@ import (
 
 // Cache is an in-memory file cache.
 type Cache struct {
+	mu      *sync.RWMutex
 	tr      *radix.Tree
 	readAny bool
 	prefix  string
 	size    int64
 	length  int
-	mu      *sync.RWMutex
+}
+
+// New returns a file cache ready to read directories.
+func New(dir string) *Cache {
+	return &Cache{
+		mu:     &sync.RWMutex{},
+		tr:     radix.New(radix.Tsafe),
+		prefix: dir,
+	}
 }
 
 // ReadDir reads a directory recursively and creates a cache
@@ -37,9 +46,9 @@ func ReadDir(dir, expr string) (*Cache, error) {
 // If a context gets done before it finishes caching all files, it returns an error.
 func ReadDirContext(ctx context.Context, dir, expr string) (*Cache, error) {
 	c := &Cache{
+		mu:     &sync.RWMutex{},
 		tr:     radix.New(radix.Tsafe),
 		prefix: dir,
-		mu:     &sync.RWMutex{},
 	}
 	r, err := regexp.Compile(expr)
 	if err != nil {
