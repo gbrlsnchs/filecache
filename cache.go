@@ -38,7 +38,7 @@ func New(dir string) *Cache {
 //
 // Files are cached in a hash map and its buffered content can be read using
 // their path without the parent directory included as the key.
-func Read(dir, expr string) (*Cache, error) {
+func ReadDir(dir, expr string) (*Cache, error) {
 	return ReadDirContext(context.Background(), dir, expr)
 }
 
@@ -72,6 +72,23 @@ func (c *Cache) Len() int {
 	return c.length
 }
 
+// Load traverses the set directory recursively to cache files that match a given regexp.
+func (c *Cache) Load(expr string) error {
+	return c.LoadContext(context.Background(), expr)
+}
+
+// LoadContext does the same as ReadDir but is context-aware.
+func (c *Cache) LoadContext(ctx context.Context, expr string) error {
+	r, err := regexp.Compile(expr)
+	if err != nil {
+		return err
+	}
+	if err = c.readDir(ctx, c.dir, r); err != nil {
+		return err
+	}
+	return nil
+}
+
 // Size returns the total size in bytes of all cached files.
 func (c *Cache) Size() int {
 	defer c.mu.RUnlock()
@@ -91,23 +108,6 @@ func (c *Cache) String() string {
 		ss = ss[:len(ss)-1]
 	}
 	return fmt.Sprintf("\n%d %s, %d %s:%v", length, s, size, ss, c.tr)
-}
-
-// Load traverses the set directory recursively to cache files that match a given regexp.
-func (c *Cache) Load(expr string) error {
-	return c.LoadContext(context.Background(), expr)
-}
-
-// LoadContext does the same as ReadDir but is context-aware.
-func (c *Cache) LoadContext(ctx context.Context, expr string) error {
-	r, err := regexp.Compile(expr)
-	if err != nil {
-		return err
-	}
-	if err = c.readDir(ctx, c.dir, r); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (c *Cache) check(ctx context.Context, dir string, r *regexp.Regexp, ff os.FileInfo) error {
