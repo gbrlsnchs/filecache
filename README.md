@@ -57,7 +57,7 @@ c := filecache.New("foobar")
 
 // do stuff...
 
-if err := c.Load(`\.log`); err != nil {
+if err := c.Load(`\.log$`); err != nil {
 	// ...
 }
 ```
@@ -70,7 +70,7 @@ c := filecache.NewSize("foobar", 100)
 
 // do stuff...
 
-if err := c.Load(`\.log`); err != nil {
+if err := c.Load(`\.log$`); err != nil {
 	// ...
 }
 ```
