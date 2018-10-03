@@ -6,12 +6,22 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	. "github.com/gbrlsnchs/filecache"
 )
 
-func TestBuffer(t *testing.T) {
+var allFiles = []string{
+	"lorem.txt", "main.go", "test.go", "test.log",
+	"dir1/lorem.txt", "dir1/main.go", "dir1/test.go", "dir1/test.log",
+	"dir2/lorem.txt", "dir2/main.go", "dir2/test.go", "dir2/test.log",
+	"dir3/lorem.txt", "dir3/main.go", "dir3/test.go", "dir3/test.log",
+	"dir4/lorem.txt", "dir4/main.go", "dir4/test.go", "dir4/test.log",
+	"dir5/lorem.txt", "dir5/main.go", "dir5/test.go", "dir5/test.log",
+}
+
+func TestCache(t *testing.T) {
 	testCases := []struct {
 		dir        string
 		expr       string
@@ -21,13 +31,13 @@ func TestBuffer(t *testing.T) {
 		isNotExist bool
 	}{
 		{expr: ".", isNotExist: true},
-		{dir: "testdata", expr: ".", files: []string{"lorem.txt", "main.go", "test.go", "test.log"}},
-		{dir: "testdata", expr: "", files: []string{"lorem.txt", "main.go", "test.go", "test.log"}},
-		{dir: "testdata", expr: `\.txt$`, files: []string{"lorem.txt"}},
-		{dir: "testdata", expr: `\.go$`, files: []string{"main.go", "test.go"}},
-		{dir: "testdata", expr: `\.(go|log)$`, files: []string{"main.go", "test.go", "test.log"}},
-		{dir: "testdata", expr: `^main\.+`, files: []string{"main.go"}},
-		{dir: "testdata", expr: `^test\.+`, files: []string{"test.log", "test.go"}},
+		{dir: "testdata", expr: ".", files: allFiles},
+		{dir: "testdata", expr: "", files: allFiles},
+		{dir: "testdata", expr: `\.txt$`, files: filter(allFiles, `\.txt$`)},
+		{dir: "testdata", expr: `\.go$`, files: filter(allFiles, `.go$`)},
+		{dir: "testdata", expr: `\.(go|log)$`, files: filter(allFiles, `\.(go|log)$`)},
+		{dir: "testdata", expr: `main\.+`, files: filter(allFiles, `main\.+`)},
+		{dir: "testdata", expr: `test\.+`, files: filter(allFiles, `test\.+`)},
 		{dir: "testdir", isNotExist: true},
 		{dir: "testdata", expr: ".", err: context.Canceled, cancel: true},
 	}
@@ -70,4 +80,14 @@ func TestBuffer(t *testing.T) {
 			}
 		})
 	}
+}
+
+func filter(s []string, expr string) (f []string) {
+	r, _ := regexp.Compile(expr)
+	for _, ss := range s {
+		if r.MatchString(ss) {
+			f = append(f, ss)
+		}
+	}
+	return f
 }
