@@ -51,6 +51,30 @@ log.Print(c.Len())  // amount of files cached
 log.Print(c.Size()) // total size in bytes
 ```
 
+### Lazy-reading a directory
+```go
+c := filecache.New("foobar")
+
+// do stuff...
+
+if err := c.Load(`\.log`); err != nil {
+	// ...
+}
+```
+
+### Setting a custom goroutine limit
+By default, this package spawns goroutines for each file inside each directory.  
+Currently, the limit of goroutines is the result of `runtime.NumCPU()`. However, it is possible to use a cache with a custom limit by using `filecache.NewSize` instead of `filecache.New`.
+```go
+c := filecache.NewSize("foobar", 100)
+
+// do stuff...
+
+if err := c.Load(`\.log`); err != nil {
+	// ...
+}
+```
+
 ## Contributing
 ### How to help
 - For bugs and opinions, please [open an issue](https://github.com/gbrlsnchs/filecache/issues/new)
