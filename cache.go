@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -17,6 +18,7 @@ import (
 // Cache is an in-memory file cache.
 type Cache struct {
 	mu      *sync.RWMutex
+	sem     chan struct{}
 	tr      *radix.Tree
 	readAny bool
 	dir     string
@@ -25,11 +27,19 @@ type Cache struct {
 }
 
 // New returns a file cache ready to read directories.
+// The semaphore size is the number of CPUs.
 func New(dir string) *Cache {
+	return NewSize(dir, runtime.NumCPU())
+}
+
+// NewSize returns a file cache with a custom
+// semaphore size ready to read directories.
+func NewSize(dir string, size int) *Cache {
 	return &Cache{
 		mu:  &sync.RWMutex{},
+		sem: make(chan struct{}, size),
 		tr:  radix.New(radix.Tsafe),
-		dir: dir,
+		dir: filepath.Join(dir),
 	}
 }
 
@@ -45,11 +55,7 @@ func ReadDir(dir, expr string) (*Cache, error) {
 // ReadDirContext is the context-aware equivalent of ReadDir.
 // If a context gets done before it finishes caching all files, it returns an error.
 func ReadDirContext(ctx context.Context, dir, expr string) (*Cache, error) {
-	c := &Cache{
-		mu:  &sync.RWMutex{},
-		tr:  radix.New(radix.Tsafe),
-		dir: filepath.Join(dir),
-	}
+	c := New(dir)
 	if err := c.LoadContext(ctx, expr); err != nil {
 		return nil, err
 	}
@@ -59,8 +65,8 @@ func ReadDirContext(ctx context.Context, dir, expr string) (*Cache, error) {
 // Get returns a buffered file content.
 func (c *Cache) Get(name string) string {
 	n, _ := c.tr.Get(filepath.Join(c.dir, name))
-	if n != nil {
-		return fmt.Sprint(n.Value)
+	if n != nil && n.Value != nil {
+		return n.Value.(*strings.Builder).String()
 	}
 	return ""
 }
@@ -83,10 +89,12 @@ func (c *Cache) LoadContext(ctx context.Context, expr string) error {
 	if err != nil {
 		return err
 	}
-	if err = c.readDir(ctx, c.dir, r); err != nil {
-		return err
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		return c.walk(ctx, c.dir, r)
 	}
-	return nil
 }
 
 // Size returns the total size in bytes of all cached files.
@@ -111,20 +119,25 @@ func (c *Cache) String() string {
 }
 
 func (c *Cache) check(ctx context.Context, dir string, r *regexp.Regexp, ff os.FileInfo) error {
-	name := ff.Name()
-	fullName := filepath.Join(dir, name)
-	if ff.IsDir() {
-		return c.walk(ctx, fullName, r)
-	}
-	f, err := os.Open(fullName)
-	if err != nil {
-		return err
-	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		name := ff.Name()
+		fullName := filepath.Join(dir, name)
+		if ff.IsDir() {
+			return c.walk(ctx, fullName, r)
+		}
+		f, err := os.Open(fullName)
+		if err != nil {
+			return err
+		}
 
-	if r.MatchString(name) {
-		return c.copy(f)
+		if r.MatchString(name) {
+			return c.copy(f)
+		}
+		return nil
 	}
-	return nil
 }
 
 func (c *Cache) copy(f *os.File) error {
@@ -142,15 +155,6 @@ func (c *Cache) copy(f *os.File) error {
 	return nil
 }
 
-func (c *Cache) readDir(ctx context.Context, dir string, r *regexp.Regexp) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-		return c.walk(ctx, dir, r)
-	}
-}
-
 func (c *Cache) walk(ctx context.Context, dir string, r *regexp.Regexp) error {
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithCancel(ctx)
@@ -163,18 +167,15 @@ func (c *Cache) walk(ctx context.Context, dir string, r *regexp.Regexp) error {
 
 	e := make(chan error)
 	var wg sync.WaitGroup
-	wg.Add(len(files))
-
 	for _, ff := range files {
-		go func(ff os.FileInfo) {
-			defer wg.Done()
-			select {
-			case <-ctx.Done():
-				select {
-				case e <- ctx.Err():
-				default:
-				}
-			default:
+		select {
+		case c.sem <- struct{}{}:
+			wg.Add(1)
+			go func(ff os.FileInfo) {
+				defer func() {
+					<-c.sem
+					wg.Done()
+				}()
 				if err := c.check(ctx, dir, r, ff); err != nil {
 					select {
 					case e <- err:
@@ -182,8 +183,12 @@ func (c *Cache) walk(ctx context.Context, dir string, r *regexp.Regexp) error {
 					default:
 					}
 				}
+			}(ff)
+		default:
+			if err = c.check(ctx, dir, r, ff); err != nil {
+				return err
 			}
-		}(ff)
+		}
 	}
 
 	wg.Wait()
