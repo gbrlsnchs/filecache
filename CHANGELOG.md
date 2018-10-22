@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2018-10-22
+### Changed
+- Use a method to set semaphore size instead of function `NewSize` because of its misleading name.
+
 ## [0.6.0] - 2018-10-22
 ### Changed
 - Update radix tree dependency.
@@ -49,6 +53,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Source code.
 - Go modules files.
 
+[0.7.0]: https://github.com/gbrlsnchs/filecache/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/gbrlsnchs/filecache/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/gbrlsnchs/filecache/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/gbrlsnchs/filecache/compare/v0.4.0...v0.4.1

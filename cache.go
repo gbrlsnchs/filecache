@@ -29,15 +29,9 @@ type Cache struct {
 // New returns a file cache ready to read directories.
 // The semaphore size is the number of CPUs.
 func New(dir string) *Cache {
-	return NewSize(dir, runtime.NumCPU())
-}
-
-// NewSize returns a file cache with a custom
-// semaphore size ready to read directories.
-func NewSize(dir string, size int) *Cache {
 	return &Cache{
 		mu:  &sync.RWMutex{},
-		sem: make(chan struct{}, size),
+		sem: make(chan struct{}, runtime.NumCPU()),
 		tr:  radix.New(radix.Tsafe),
 		dir: filepath.Join(dir),
 	}
@@ -95,6 +89,10 @@ func (c *Cache) LoadContext(ctx context.Context, expr string) error {
 	default:
 		return c.walk(ctx, c.dir, r)
 	}
+}
+
+func (c *Cache) SetSemaphoreSize(size int) {
+	c.sem = make(chan struct{}, size)
 }
 
 // Size returns the total size in bytes of all cached files.

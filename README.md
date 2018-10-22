@@ -64,12 +64,10 @@ if err := c.Load(`\.log$`); err != nil {
 
 ### Setting a custom goroutine limit
 By default, this package spawns goroutines for each file inside each directory.  
-Currently, the limit of goroutines is the result of `runtime.NumCPU()`. However, it is possible to use a cache with a custom limit by using `filecache.NewSize` instead of `filecache.New`.
+Currently, the limit of goroutines is the result of `runtime.NumCPU()`. However, it is possible to use a cache with a custom limit by using the method `SetSemaphoreSize`.
 ```go
-c := filecache.NewSize("foobar", 100)
-
-// do stuff...
-
+c := filecache.New("foobar")
+c.SetSemaphoreSize(100)
 if err := c.Load(`\.log$`); err != nil {
 	// ...
 }
