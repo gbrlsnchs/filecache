@@ -1,13 +1,4 @@
-github.com/fatih/color v1.6.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
-github.com/fatih/color v1.7.0 h1:DkWD4oS2D8LGGgTQ6IvwJJXSL5Vp2ffcQg58nFV38Ys=
-github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
-github.com/gbrlsnchs/radix v1.0.0-beta.0 h1:mRBO7NuDZE7h4dal+mo8YcG2VTcZf8FMC++cxjLnKR4=
-github.com/gbrlsnchs/radix v1.0.0-beta.0/go.mod h1:PdKwtrLfTiUa3x6XS+gpFT6L/QM5OOqqoHsfOpgYvyo=
-github.com/mattn/go-colorable v0.0.9 h1:UVL0vNpWh04HeJXV0KLcaT7r06gOH2l4OW6ddYRUIY4=
-github.com/mattn/go-colorable v0.0.9/go.mod h1:9vuHe8Xs5qXnSaW/c/ABM9alt+Vo+STaOChaDxuIBZU=
-github.com/mattn/go-isatty v0.0.3/go.mod h1:M+lRXTBqGeGNdLjl/ufCoiOlB5xdOkqRJdNxMWT7Zi4=
-github.com/mattn/go-isatty v0.0.4 h1:bnP0vzxcAdeI1zdubAl5PjU6zsERjGZb7raWodagDYs=
-github.com/mattn/go-isatty v0.0.4/go.mod h1:M+lRXTBqGeGNdLjl/ufCoiOlB5xdOkqRJdNxMWT7Zi4=
-golang.org/x/sys v0.0.0-20180315095008-cc7307a45468/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
-golang.org/x/sys v0.0.0-20180925112736-b09afc3d579e h1:LSlw/Dbj0MkNvPYAAkGinYmGliq+aqS7eKPYlE4oWC4=
-golang.org/x/sys v0.0.0-20180925112736-b09afc3d579e/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
+github.com/gbrlsnchs/color v0.1.0 h1:kqGI5bcsfjpkIhVL1g4IpuCA5DL+lnF1mFy8XZ7ffKg=
+github.com/gbrlsnchs/color v0.1.0/go.mod h1:DqmJ75IHg1obs9e8r0r7Q691hcywJBRUYtbxu/rBuWg=
+github.com/gbrlsnchs/radix v1.0.0-beta.1 h1:SVirJRfk2MZiiQYpjLjIaqvisUILhH2+S1YuGUZINyM=
+github.com/gbrlsnchs/radix v1.0.0-beta.1/go.mod h1:Rv0ueYu+grgwp1/ea0UUKeUlqMOqRXzf/3Ud2hFLB+E=
